@@ -1,30 +1,34 @@
 <?php
-include 'config/db.php';
+require_once '../config/db.php';
+$conn = getPDOConnection(); 
 
-$id = $_GET['id'] ?? 0;
-$id = (int)$id;
+$id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
 if ($id > 0) {
-  
-    $result = mysqli_query($conn, "SELECT status FROM products WHERE id = $id AND is_deleted = 0");
+    try {
+   
+        $stmt = $conn->prepare("SELECT status FROM products WHERE id = :id AND is_deleted = 0");
+        $stmt->execute([':id' => $id]);
+        $product = $stmt->fetch();
 
-    if ($result && mysqli_num_rows($result) > 0) {
-        $row = mysqli_fetch_assoc($result);
-        $currentStatus = $row['status'];
+        if ($product) {
+            $currentStatus = $product['status'];
+            $newStatus = ($currentStatus === 'active') ? 'inactive' : 'active';
 
-     
-        $newStatus = ($currentStatus === 'active') ? 'inactive' : 'active';
+          
+            $updateStmt = $conn->prepare("UPDATE products SET status = :status WHERE id = :id");
+            $updateStmt->execute([
+                ':status' => $newStatus,
+                ':id'     => $id
+            ]);
 
-    
-        $update = "UPDATE products SET status = '$newStatus' WHERE id = $id";
-        if (mysqli_query($conn, $update)) {
             header("Location: index.php");
             exit;
         } else {
-            echo "Failed to update status: " . mysqli_error($conn);
+            echo "Product not found.";
         }
-    } else {
-        echo "Product not found.";
+    } catch (PDOException $e) {
+        echo "Error: " . $e->getMessage();
     }
 } else {
     echo "Invalid ID.";
