@@ -10,7 +10,6 @@ $conn = getPDOConnection();
 $id = (int) $_GET['id'];
 $errors = [];
 
-// Fetch existing product
 $stmt = $conn->prepare("SELECT * FROM products WHERE id = :id AND is_deleted = 0");
 $stmt->execute(['id' => $id]);
 $product = $stmt->fetch();
