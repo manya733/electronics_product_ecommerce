@@ -1,6 +1,6 @@
 <?php
-include '../config/db.php';
-
+require_once '../config/db.php';
+$conn = getPDOConnection();
 $name = $price = $stock = $status = "";
 $image = '';
 $errors = [];
@@ -12,57 +12,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $status = $_POST['status'];
 
 
+    if (empty($name)) $errors[] = "Name is required";
+    if (!is_numeric($price)) $errors[] = "Price must be a number";
+    if (!is_numeric($stock)) $errors[] = "Stock must be a number";
+
+
     if (isset($_FILES['image']) && $_FILES['image']['error'] === 0) {
-    $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    $fileType = mime_content_type($_FILES['image']['tmp_name']);
+        $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        $fileType = mime_content_type($_FILES['image']['tmp_name']);
 
-    if (!in_array($fileType, $allowedTypes)) {
-        $errors[] = "Only JPG, PNG, GIF, and WEBP images are allowed.";
-    } else {
-        $imageName = time() . '_' . basename($_FILES['image']['name']);
-        $uploadDir = "images/";
-        $uploadPath = $uploadDir . $imageName;
-
-        // Make sure the images/ folder exists
-        if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0777, true);
-        }
-
-        if (move_uploaded_file($_FILES['image']['tmp_name'], $uploadPath)) {
-            $image = $imageName;
+        if (!in_array($fileType, $allowedTypes)) {
+            $errors[] = "Only JPG, PNG, GIF, and WEBP images are allowed.";
         } else {
-            $errors[] = "Failed to upload image.";
+            $imageName = time() . '_' . basename($_FILES['image']['name']);
+            $uploadDir = __DIR__ . "/images/";
+            $uploadPath = $uploadDir . $imageName;
+
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0777, true);
+            }
+
+            if (move_uploaded_file($_FILES['image']['tmp_name'], $uploadPath)) {
+                $image = $imageName;
+            } else {
+                $errors[] = "Failed to move uploaded image.";
+            }
         }
-    }
+    } else {
+        $errors[] = "Image is required";
     }
 
 
     if (empty($errors)) {
-    $price  = (float)$price;
-    $stock  = (int)$stock;
+        try {
+            $stmt = $conn->prepare("INSERT INTO products (name, image, price, stock, status, is_deleted)
+                                    VALUES (:name, :image, :price, :stock, :status, 0)");
+            $stmt->execute([
+                ':name'   => $name,
+                ':image'  => $image,
+                ':price'  => $price,
+                ':stock'  => $stock,
+                ':status' => $status
+            ]);
 
-    try {
-        $query = "INSERT INTO products (name, image, price, stock, status, is_deleted)
-                  VALUES (:name, :image, :price, :stock, :status, 0)";
-        
-        $stmt = $conn->prepare($query);
-        $stmt->execute([
-            ':name'   => $name,
-            ':image'  => $image,
-            ':price'  => $price,
-            ':stock'  => $stock,
-            ':status' => $status
-        ]);
-
-        header("Location: index.php");
-        exit;
-
-    } catch (PDOException $e) {
-        $errors[] = "Insert failed: " . $e->getMessage();
+            header("Location: index.php");
+            exit;
+        } catch (PDOException $e) {
+            $errors[] = "Database error: " . $e->getMessage();
+        }
     }
 }
-}
 ?>
+
 <!DOCTYPE html>
 <html>
 <head>
